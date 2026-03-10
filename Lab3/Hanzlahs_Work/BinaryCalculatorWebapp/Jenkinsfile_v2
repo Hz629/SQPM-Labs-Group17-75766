@@ -51,21 +51,25 @@ spec:
         }
 
         stage('Containerize') {
-            steps {
-                container('gcloud') {
-                    withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
-                        sh '''
-                        gcloud auth activate-service-account --key-file=$GCLOUD_KEY
-                        gcloud config set project $PROJECT_ID
-                        gcloud auth configure-docker us-central1-docker.pkg.dev -q
+    steps {
+        container('gcloud') {
+            withCredentials([file(credentialsId: 'gcloud-key', variable: 'GCLOUD_KEY')]) {
+                sh '''
+                apt-get update
+                apt-get install -y docker.io
 
-                        docker build -t $REPO_PATH/binarycalculator:latest Lab3/Hanzlahs_Work/BinaryCalculatorWebapp
-                        docker push $REPO_PATH/binarycalculator:latest
-                        '''
-                    }
-                }
+                gcloud auth activate-service-account --key-file=$GCLOUD_KEY
+                gcloud config set project $PROJECT_ID
+
+                gcloud auth configure-docker us-central1-docker.pkg.dev -q
+
+                docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/binarycalculator/binarycalculator:latest Lab3/Hanzlahs_Work/BinaryCalculatorWebapp
+                docker push us-central1-docker.pkg.dev/$PROJECT_ID/binarycalculator/binarycalculator:latest
+                '''
             }
         }
+    }
+}
 
         stage('Deploy') {
             steps {
