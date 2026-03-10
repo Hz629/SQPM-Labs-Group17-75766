@@ -19,10 +19,11 @@ spec:
     }
 
     environment {
-        PROJECT_ID = credentials('PROJECT_ID')
-        CLUSTER_NAME = credentials('CLUSTER_NAME')
-        CLUSTER_ZONE = credentials('CLUSTER_ZONE')
-        REPO_PATH = credentials('REPO_PATH')
+    PROJECT_ID = credentials('project_id')
+    CLUSTER_NAME = credentials('cluster_name')
+    CLUSTER_ZONE = credentials('cluster_zone')
+    REPO_PATH = credentials('repo_path')
+}
     }
 
     stages {
