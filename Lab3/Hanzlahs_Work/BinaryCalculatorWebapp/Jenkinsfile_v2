@@ -1,111 +1,131 @@
+
 pipeline {
-    agent {
-        kubernetes {
-            label 'binarycalculator-cicd'
-            defaultContainer 'gcloud'
-            yaml """
+
+```
+agent {
+    kubernetes {
+        label 'binarycalculator-cicd'
+        defaultContainer 'gcloud'
+        yaml """
+```
+
 apiVersion: v1
 kind: Pod
 spec:
-  containers:
-  - name: gcloud
-    image: google/cloud-sdk:latest
-    command:
-    - cat
+containers:
+
+* name: gcloud
+  image: google/cloud-sdk:latest
+  command:
+
+  * cat
     tty: true
-"""
-        }
+    """
+    }
     }
 
-    environment {
-        PROJECT_ID = credentials('project_id')
-        CLUSTER_NAME = credentials('cluster_name')
-        CLUSTER_ZONE = credentials('cluster_zone')
-        REPO_PATH = credentials('repo_path')
-    }
+  environment {
+  PROJECT_ID = credentials('project_id')
+  REPO_PATH = credentials('repo_path')
+  CLUSTER_NAME = credentials('cluster_name')
+  CLUSTER_ZONE = credentials('cluster_zone')
+  }
 
-    stages {
+  stages {
 
-        stage('Test') {
-            steps {
-                container('gcloud') {
-                    sh '''
-                    apt-get update
-                    apt-get install -y maven
-                    mvn -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml test
-                    '''
-                }
-            }
-        }
+  ```
+  stage('Checkout') {
+      steps {
+          checkout scm
+      }
+  }
 
-        stage('Build') {
-            steps {
-                container('gcloud') {
-                    sh '''
-                    apt-get update
-                    apt-get install -y maven
-                    mvn -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml clean package
-                    '''
-                }
-            }
-        }
+  stage('Test') {
+      steps {
+          container('gcloud') {
+              sh '''
+              apt-get update
+              apt-get install -y maven
 
-        stage('Containerize') {
-    steps {
-        container('gcloud') {
-            withCredentials([file(credentialsId: 'gcloud-key', variable: 'GCLOUD_KEY')]) {
-                sh '''
-                apt-get update
-                apt-get install -y docker.io
+              mvn -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml test
+              '''
+          }
+      }
+  }
 
-                gcloud auth activate-service-account --key-file=$GCLOUD_KEY
-                gcloud config set project $PROJECT_ID
+  stage('Build') {
+      steps {
+          container('gcloud') {
+              sh '''
+              mvn -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml clean package
+              '''
+          }
+      }
+  }
 
-                gcloud auth configure-docker us-central1-docker.pkg.dev -q
+  stage('Containerize') {
+      steps {
+          container('gcloud') {
+              withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
+                  sh '''
+                  apt-get update
+                  apt-get install -y docker.io
 
-                docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/binarycalculator/binarycalculator:latest Lab3/Hanzlahs_Work/BinaryCalculatorWebapp
-                docker push us-central1-docker.pkg.dev/$PROJECT_ID/binarycalculator/binarycalculator:latest
-                '''
-            }
-        }
-    }
-}
+                  gcloud auth activate-service-account --key-file=$GCLOUD_KEY
+                  gcloud config set project $PROJECT_ID
 
-        stage('Deploy') {
-            steps {
-                container('gcloud') {
-                    withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
-                        sh '''
-                        gcloud auth activate-service-account --key-file=$GCLOUD_KEY
-                        gcloud config set project $PROJECT_ID
+                  gcloud auth configure-docker us-central1-docker.pkg.dev -q
 
-                        gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
+                  docker build -t $REPO_PATH/binarycalculator:latest Lab3/Hanzlahs_Work/BinaryCalculatorWebapp
+                  docker push $REPO_PATH/binarycalculator:latest
+                  '''
+              }
+          }
+      }
+  }
 
-                        kubectl delete deployment binarycalculator --ignore-not-found
-                        kubectl apply -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/binarycalculator-deploy.yaml
-                        '''
-                    }
-                }
-            }
-        }
+  stage('Deploy') {
+      steps {
+          container('gcloud') {
+              withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
+                  sh '''
+                  apt-get update
+                  apt-get install -y kubectl
 
-        stage('Service') {
-            steps {
-                container('gcloud') {
-                    withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
-                        sh '''
-                        gcloud auth activate-service-account --key-file=$GCLOUD_KEY
-                        gcloud config set project $PROJECT_ID
+                  gcloud auth activate-service-account --key-file=$GCLOUD_KEY
+                  gcloud config set project $PROJECT_ID
 
-                        gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
+                  gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
 
-                        kubectl apply -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/binarycalculator-service.yaml
-                        kubectl get services
-                        '''
-                    }
-                }
-            }
-        }
+                  kubectl apply -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/binarycalculator-deployment.yaml
+                  kubectl get pods
+                  '''
+              }
+          }
+      }
+  }
 
-    }
-}
+  stage('Service') {
+      steps {
+          container('gcloud') {
+              withCredentials([file(credentialsId: 'service_account', variable: 'GCLOUD_KEY')]) {
+                  sh '''
+                  apt-get update
+                  apt-get install -y kubectl
+
+                  gcloud auth activate-service-account --key-file=$GCLOUD_KEY
+                  gcloud config set project $PROJECT_ID
+
+                  gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
+
+                  kubectl apply -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/binarycalculator-service.yaml
+                  kubectl get services
+                  '''
+              }
+          }
+      }
+  }
+  ```
+
+  }
+  }
