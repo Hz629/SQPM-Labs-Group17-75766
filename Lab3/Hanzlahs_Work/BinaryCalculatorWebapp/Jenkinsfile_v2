@@ -96,14 +96,12 @@ pipeline {
                             }
                         }
                         // display the service IP
-                        sh "kubectl get service/binarycalculator-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
+                                               sh "kubectl get service/binarycalculator-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
                     }
                 }
             }
         }
     }
 }
-}
-  
 
 
