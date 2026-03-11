@@ -1,19 +1,19 @@
 pipeline {
 
-environment {
-    SERVICE_ACCOUNT = credentials('service_account')
-    PROJECT = credentials('project_id')
-    REPO_PATH = credentials("repo_path")
-    APP_NAME = "binarycalculatorwebapp"
-    IMAGE_TAG = "$REPO_PATH/$APP_NAME"
-    CLUSTER = credentials("cluster_name")
-    CLUSTER_ZONE = credentials("cluster_zone")
-}
+    environment {
+        SERVICE_ACCOUNT = credentials('service_account')
+        PROJECT = credentials('project_id')
+        REPO_PATH = credentials("repo_path")
+        APP_NAME = "binarycalculatorwebapp"
+        IMAGE_TAG = "$REPO_PATH/$APP_NAME"
+        CLUSTER = credentials("cluster_name")
+        CLUSTER_ZONE = credentials("cluster_zone")
+    }
 
-agent {
-    kubernetes {
-        label 'sample-app'
-        yaml """
+    agent {
+        kubernetes {
+            label 'sample-app'
+            yaml """
 apiVersion: v1
 kind: Pod
 metadata:
@@ -27,95 +27,94 @@ spec:
     - cat
     tty: true
 """
-    }
-}
-
-stages {
-
-stage('test') {
-    steps {
-        container('gcloud') {
-            sh '''
-            apt-get update
-            apt-get install -y maven
-            mvn clean test -f ./BinaryCalculatorWebapp/pom.xml
-            '''
         }
     }
-}
 
-stage('build') {
-    steps {
-        container('gcloud') {
-            sh '''
-            apt-get update
-            apt-get install -y maven
-            mvn clean package -DskipTests -f ./BinaryCalculatorWebapp/pom.xml
-            '''
-        }
-    }
-}
+    stages {
 
-stage('containerize') {
-    steps {
-        container('gcloud') {
-            dir('BinaryCalculatorWebapp') {
-
-                sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
-                sh 'gcloud config set project $PROJECT'
-
-                sh 'gcloud builds submit -t $IMAGE_TAG --suppress-logs'
+        stage('test') {
+            steps {
+                container('gcloud') {
+                    sh '''
+                    apt-get update
+                    apt-get install -y maven
+                    mvn clean test -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml
+                    '''
+                }
             }
         }
-    }
-}
 
-stage('deployment') {
-    steps {
-        container('gcloud') {
-            dir('BinaryCalculatorWebapp') {
+        stage('build') {
+            steps {
+                container('gcloud') {
+                    sh '''
+                    apt-get update
+                    apt-get install -y maven
+                    mvn clean package -DskipTests -f Lab3/Hanzlahs_Work/BinaryCalculatorWebapp/pom.xml
+                    '''
+                }
+            }
+        }
 
-                sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
-                sh 'gcloud config set project $PROJECT'
-                sh 'gcloud container clusters get-credentials $CLUSTER --region=$CLUSTER_ZONE'
+        stage('containerize') {
+            steps {
+                container('gcloud') {
+                    dir('Lab3/Hanzlahs_Work/BinaryCalculatorWebapp') {
 
-                script {
-                    try {
-                        sh 'kubectl delete deployment binarycalculator-deployment'
-                    } catch (Exception e) {
-                        echo "Deployment does not exist"
+                        sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
+                        sh 'gcloud config set project $PROJECT'
+                        sh 'gcloud builds submit -t $IMAGE_TAG --suppress-logs'
                     }
                 }
-
-                sh 'kubectl create deployment binarycalculator-deployment --image=$IMAGE_TAG --port=8080'
             }
         }
-    }
-}
 
-stage('service') {
-    steps {
-        container('gcloud') {
-            dir('BinaryCalculatorWebapp') {
+        stage('deployment') {
+            steps {
+                container('gcloud') {
+                    dir('Lab3/Hanzlahs_Work/BinaryCalculatorWebapp') {
 
-                sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
-                sh 'gcloud config set project $PROJECT'
-                sh 'gcloud container clusters get-credentials $CLUSTER --region=$CLUSTER_ZONE'
+                        sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
+                        sh 'gcloud config set project $PROJECT'
+                        sh 'gcloud container clusters get-credentials $CLUSTER --region=$CLUSTER_ZONE'
 
-                script {
-                    try {
-                        sh 'kubectl expose deployment binarycalculator-deployment --type=LoadBalancer --name=binarycalculator-service'
-                    } catch (Exception e) {
-                        echo "Service already exists"
+                        script {
+                            try {
+                                sh 'kubectl delete deployment binarycalculator-deployment'
+                            } catch (Exception e) {
+                                echo "Deployment does not exist"
+                            }
+                        }
+
+                        sh 'kubectl create deployment binarycalculator-deployment --image=$IMAGE_TAG --port=8080'
                     }
                 }
-
-                sh "kubectl get service/binarycalculator-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
             }
         }
-    }
-}
 
-}
+        stage('service') {
+            steps {
+                container('gcloud') {
+                    dir('Lab3/Hanzlahs_Work/BinaryCalculatorWebapp') {
+
+                        sh 'gcloud auth activate-service-account --key-file $SERVICE_ACCOUNT'
+                        sh 'gcloud config set project $PROJECT'
+                        sh 'gcloud container clusters get-credentials $CLUSTER --region=$CLUSTER_ZONE'
+
+                        script {
+                            try {
+                                sh 'kubectl expose deployment binarycalculator-deployment --type=LoadBalancer --name=binarycalculator-service'
+                            } catch (Exception e) {
+                                echo "Service already exists"
+                            }
+                        }
+
+                        sh "kubectl get service/binarycalculator-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
+                    }
+                }
+            }
+        }
+
+    }
 
 }
